@@ -20,23 +20,18 @@ import pickle
 #sys.path
 
 
-# In[143]:
+# #this does't actually need to be protected. More a reminder it's an interim measure
+# try:
+#     sys.path.append('../unsupported')
+#     sys.path.append('./unsupported')
+# except:
+#     pass
 
-#this does't actually need to be protected. More a reminder it's an interim measure
-try:
-    sys.path.append('../unsupported')
-    sys.path.append('./unsupported')
-except:
-    pass
-
-
-# In[144]:
-
-#
-from unsupported_dan.utilities.interpolation import nn_evaluation
-from unsupported_dan.interfaces.marker2D import markerLine2D
-from unsupported_dan.faults.faults2D import fault2D, fault_collection
-
+# #
+# from unsupported_dan.utilities.interpolation import nn_evaluation
+# from unsupported_dan.interfaces.marker2D import markerLine2D
+# from unsupported_dan.faults.faults2D import fault2D, fault_collection
+# 
 
 # ## Setup out Dirs
 
@@ -165,7 +160,7 @@ md = edict({})
 md.refineMeshStatic=True
 md.stickyAir=False
 md.aspectRatio=1.
-md.res=64
+md.res=48
 md.ppc=35                                 #particles per cell
 #md.elementType="Q1/dQ0"
 md.elementType="Q2/DPC1"
@@ -180,28 +175,6 @@ md.dissipativeHeating = True
 md.powerLaw = False
 md.interfaceDiffusivityFac = 1.
 
-
-
-# In[ ]:
-
-
-
-
-# In[148]:
-
-uw.barrier()
-
-
-# In[149]:
-
-##Parse any command-line args
-
-from unsupported_dan.cl_args import easy_args
-sysArgs = sys.argv
-
-#We want to run this on both the paramter dict, and the model dict
-easy_args(sysArgs, dp)
-easy_args(sysArgs, md)
 
 
 # In[150]:
@@ -387,26 +360,18 @@ circ1 = circleFn((-0.25, 0.8), 0.05)
 nodes = circ1.evaluate(mesh).nonzero()[0]
 
 
-# In[159]:
+# In[171]:
 
-#nodes = np.where(bcMeshVar.evaluate(mesh) > 0.5 )[0]
-#nodes = np.where(mesh.data[:,1] < (1. - (mesh.data[:,0] + 0.5)))[0]
+nodes = circ1.evaluate(mesh).nonzero()[0]
 
-
-#Setup a vector the fixed internal velocity BCs
-velocityField.data[:] = 0.
-rotMatrix = np.array([[np.cos(-1.*np.deg2rad(ndp.theta)), -np.sin(-1.*np.deg2rad(ndp.theta)) ], 
-                         [np.sin(-1.*np.deg2rad(ndp.theta)),  np.cos(-1.*np.deg2rad(ndp.theta))]])
-velHat = np.dot(rotMatrix, [1.0,0.])
-velocityField.data[nodes]= velHat*ndp.subVelocity
-
+velocityField.data[nodes]= [1.0,0.]
 
 drivenVel = mesh.specialSets["Empty"]
-drivenVel.add(nodes)
 
-drivenVel = drivenVel - lWalls - bWalls
+#if uw.rank() == 0:
+drivenVel.add(nodes)  
 
-
+drivenVel = drivenVel - lWalls - bWalls - rWalls
 
 
 # In[160]:
@@ -416,25 +381,10 @@ drivenVel = drivenVel - lWalls - bWalls
 stressField.data[...] = (0.0,0.0,0.0)
 
 
-#Velocity
-#velNbc = uw.conditions.NeumannCondition( flux=stressField, 
-#                                      variable=velocityField,
-#                                      nodeIndexSet=(iWalls + bWalls) )
-
 velDbc = uw.conditions.DirichletCondition( variable      = velocityField, 
                                                indexSetsPerDof = ( iWalls + drivenVel, jWalls + drivenVel) )
 
 
-
-#Temp
-
-dT_dy = [0.,0.]
-tempNbc = uw.conditions.NeumannCondition( flux=dT_dy, variable=temperatureField,
-                                              nodeIndexSet = (bWalls) )
-    
-    
-tempDbc = uw.conditions.DirichletCondition( variable      = temperatureField, 
-                                               indexSetsPerDof =  tWalls + iWalls )
 
 
 # In[161]:
@@ -463,7 +413,7 @@ stokesPIC = uw.systems.Stokes( velocityField  = velocityField,
 #md.penaltyMethod=False
 
 
-# In[165]:
+# In[173]:
 
 solver = uw.systems.Solver(stokesPIC)
 
@@ -474,20 +424,12 @@ solver = uw.systems.Solver(stokesPIC)
 
 
 
-# In[166]:
+# In[ ]:
 
+solver.set_inner_method("mumps")
+#solver.ptions.scr.ksp_type="cg"
+solver.set_penalty(1.0e5)
 
-if md.penaltyMethod:
-    solver.set_inner_method("mumps")
-    solver.options.scr.ksp_type="cg"
-    solver.set_penalty(1.0e7)
-    solver.options.scr.ksp_rtol = 1.0e-4
-
-else:
-    solver.options.main.Q22_pc_type='gkgdiag'
-    solver.options.scr.ksp_rtol=5e-5
-    solver.set_inner_method('mg')
-    solver.options.mg.levels = 4
 
 
 # In[167]:
@@ -509,6 +451,11 @@ uw.barrier()
 # In[170]:
 
 print("solve done")
+
+
+# In[178]:
+
+solver.options.scr.ksp_type
 
 
 # In[ ]:
