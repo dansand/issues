@@ -44,6 +44,11 @@ lWalls = mesh.specialSets["MinI_VertexSet"]
 rWalls = mesh.specialSets["MaxI_VertexSet"]
 
 
+# In[ ]:
+
+print("local leftWall node count: ", len(lWalls.data))
+
+
 # In[39]:
 
 def circleFn(centre, radius):
@@ -115,16 +120,18 @@ solver.solve(nonLinearIterate=True)
 
 
 
-# In[47]:
+# In[50]:
 
 figVel= glucifer.Figure(quality=3)
 
 figVel.append( glucifer.objects.Surface(mesh, fn.math.dot(velocityField,velocityField)))
+figVel.append( glucifer.objects.Surface(mesh, circ1))
+
 figVel.append( glucifer.objects.VectorArrows(mesh, velocityField*1.  ))
 figVel.append( glucifer.objects.Mesh(mesh, opacity = 0.3  ))
 
 
-# In[48]:
+# In[51]:
 
 figVel.save_image('vel.png')
 figVel.save_database('vel.gldb')
