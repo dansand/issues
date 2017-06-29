@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[141]:
+# In[4]:
 
 import numpy as np
 import underworld as uw
@@ -15,27 +15,9 @@ import operator
 import pickle
 
 
-# In[142]:
-
-#sys.path
-
-
-# #this does't actually need to be protected. More a reminder it's an interim measure
-# try:
-#     sys.path.append('../unsupported')
-#     sys.path.append('./unsupported')
-# except:
-#     pass
-
-# #
-# from unsupported_dan.utilities.interpolation import nn_evaluation
-# from unsupported_dan.interfaces.marker2D import markerLine2D
-# from unsupported_dan.faults.faults2D import fault2D, fault_collection
-# 
-
 # ## Setup out Dirs
 
-# In[145]:
+# In[5]:
 
 ############
 #Model letter and number
@@ -63,7 +45,7 @@ else:
                 Model  = farg
 
 
-# In[146]:
+# In[6]:
 
 ###########
 #Standard output directory setup
@@ -95,7 +77,7 @@ uw.barrier() #Barrier here so no procs run the check in the next cell too early
 
 # ## Params
 
-# In[147]:
+# In[7]:
 
 dp = edict({})
 #Main physical paramters
@@ -177,7 +159,7 @@ md.interfaceDiffusivityFac = 1.
 
 
 
-# In[150]:
+# In[8]:
 
 sf = edict({})
 
@@ -271,12 +253,12 @@ ndp.subVelocity = dp.subVelocity/sf.velocity
 
 # ## Make mesh / FeVariables
 
-# In[151]:
+# In[9]:
 
 #1. - ndp.depth
 
 
-# In[152]:
+# In[10]:
 
 #Domain and Mesh paramters
 yres = int(md.res)
@@ -302,7 +284,7 @@ diffusivityFn = fn.misc.constant(1.)
     
 
 
-# In[153]:
+# In[11]:
 
 velocityField.data[:] = 0.
 pressureField.data[:] = 0.
@@ -310,7 +292,7 @@ temperatureField.data[:] = 0.
 initialtemperatureField.data[:] = 0.
 
 
-# In[154]:
+# In[12]:
 
 #Uw geometry shortcuts
 
@@ -324,14 +306,14 @@ yFn = coordinate[1]
 
 # ## Temp. Field
 
-# In[155]:
+# In[13]:
 
 temperatureField.data[:] = 1
 
 
 # ## Boundary Conditions
 
-# In[156]:
+# In[14]:
 
 iWalls = mesh.specialSets["MinI_VertexSet"] + mesh.specialSets["MaxI_VertexSet"]
 jWalls = mesh.specialSets["MinJ_VertexSet"] + mesh.specialSets["MaxJ_VertexSet"]
@@ -343,12 +325,12 @@ rWalls = mesh.specialSets["MaxI_VertexSet"]
         
 
 
-# In[157]:
+# In[15]:
 
 #Now we need to set the velocity in the Slab 
 
 
-# In[158]:
+# In[16]:
 
 #use a circle Fn to tag some nodes for a velocity condition
 
@@ -360,7 +342,7 @@ circ1 = circleFn((-0.25, 0.8), 0.05)
 nodes = circ1.evaluate(mesh).nonzero()[0]
 
 
-# In[171]:
+# In[17]:
 
 nodes = circ1.evaluate(mesh).nonzero()[0]
 
@@ -374,7 +356,7 @@ drivenVel.add(nodes)
 drivenVel = drivenVel - lWalls - bWalls - rWalls
 
 
-# In[160]:
+# In[18]:
 
 #All the bCs
 
@@ -387,19 +369,19 @@ velDbc = uw.conditions.DirichletCondition( variable      = velocityField,
 
 
 
-# In[161]:
+# In[19]:
 
 viscosityMapFn = fn.misc.constant(1.)
 
 
-# In[162]:
+# In[20]:
 
 uw.barrier()
 
 
 # ## Stokes
 
-# In[163]:
+# In[21]:
 
 stokesPIC = uw.systems.Stokes( velocityField  = velocityField, 
                                    pressureField  = pressureField,
@@ -408,57 +390,24 @@ stokesPIC = uw.systems.Stokes( velocityField  = velocityField,
                                    fn_bodyforce   = (0., 0.) )
 
 
-# In[164]:
-
-#md.penaltyMethod=False
-
-
-# In[173]:
+# In[23]:
 
 solver = uw.systems.Solver(stokesPIC)
 
 
-    
-    
-    
-
-
+# ## problem
+# 
+# currently, setting the `solver.options.main.Q22_pc_type` to anything other than 'uw' (the default), results in a petsc crash in parallel. 
+# 
 
 # In[ ]:
 
-solver.set_inner_method("mumps")
-#solver.ptions.scr.ksp_type="cg"
-solver.set_penalty(1.0e5)
 
+
+solver.options.main.Q22_pc_type='gkgdiag' #should crash in parallel
 
 
 # In[167]:
 
 print("First solve")
-
-
-# In[168]:
-
-#solver.solve(nonLinearIterate=True, nonLinearTolerance=md.nltol)
-solver.solve()
-
-
-# In[169]:
-
-uw.barrier()
-
-
-# In[170]:
-
-print("solve done")
-
-
-# In[178]:
-
-solver.options.scr.ksp_type
-
-
-# In[ ]:
-
-
 
