@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[4]:
+# In[22]:
 
 import numpy as np
 import underworld as uw
@@ -17,7 +17,7 @@ import pickle
 
 # ## Setup out Dirs
 
-# In[5]:
+# In[23]:
 
 ############
 #Model letter and number
@@ -45,7 +45,7 @@ else:
                 Model  = farg
 
 
-# In[6]:
+# In[24]:
 
 ###########
 #Standard output directory setup
@@ -77,7 +77,7 @@ uw.barrier() #Barrier here so no procs run the check in the next cell too early
 
 # ## Params
 
-# In[7]:
+# In[25]:
 
 dp = edict({})
 #Main physical paramters
@@ -142,7 +142,7 @@ md = edict({})
 md.refineMeshStatic=True
 md.stickyAir=False
 md.aspectRatio=1.
-md.res=48
+md.res=72
 md.ppc=35                                 #particles per cell
 #md.elementType="Q1/dQ0"
 md.elementType="Q2/DPC1"
@@ -159,7 +159,7 @@ md.interfaceDiffusivityFac = 1.
 
 
 
-# In[8]:
+# In[26]:
 
 sf = edict({})
 
@@ -253,12 +253,12 @@ ndp.subVelocity = dp.subVelocity/sf.velocity
 
 # ## Make mesh / FeVariables
 
-# In[9]:
+# In[27]:
 
 #1. - ndp.depth
 
 
-# In[10]:
+# In[28]:
 
 #Domain and Mesh paramters
 yres = int(md.res)
@@ -284,7 +284,7 @@ diffusivityFn = fn.misc.constant(1.)
     
 
 
-# In[11]:
+# In[29]:
 
 velocityField.data[:] = 0.
 pressureField.data[:] = 0.
@@ -292,7 +292,7 @@ temperatureField.data[:] = 0.
 initialtemperatureField.data[:] = 0.
 
 
-# In[12]:
+# In[30]:
 
 #Uw geometry shortcuts
 
@@ -306,14 +306,14 @@ yFn = coordinate[1]
 
 # ## Temp. Field
 
-# In[13]:
+# In[31]:
 
 temperatureField.data[:] = 1
 
 
 # ## Boundary Conditions
 
-# In[14]:
+# In[32]:
 
 iWalls = mesh.specialSets["MinI_VertexSet"] + mesh.specialSets["MaxI_VertexSet"]
 jWalls = mesh.specialSets["MinJ_VertexSet"] + mesh.specialSets["MaxJ_VertexSet"]
@@ -325,14 +325,14 @@ rWalls = mesh.specialSets["MaxI_VertexSet"]
         
 
 
-# In[15]:
+# In[33]:
 
 #Now we need to set the velocity in the Slab 
 
 
-# In[16]:
+# In[34]:
 
-#use a circle Fn to tag some nodes for a velocity condition
+#build a circle to tag some nodes for a velocity condition
 
 def circleFn(centre, radius):
     _circFn = (((coordinate[0] - centre[0])**2) + ((coordinate[1] - centre[1])**2)) < radius**2
@@ -342,7 +342,11 @@ circ1 = circleFn((-0.25, 0.8), 0.05)
 nodes = circ1.evaluate(mesh).nonzero()[0]
 
 
-# In[17]:
+# In[35]:
+
+#get the mesh nodes that are in the circle, 
+#set a finite velocity, 
+#and create and index set to hand to the boundary condtion
 
 nodes = circ1.evaluate(mesh).nonzero()[0]
 
@@ -353,10 +357,11 @@ drivenVel = mesh.specialSets["Empty"]
 #if uw.rank() == 0:
 drivenVel.add(nodes)  
 
+#remove any overlapping wall nodes (although these shouldn't overlap in the current example )
 drivenVel = drivenVel - lWalls - bWalls - rWalls
 
 
-# In[18]:
+# In[36]:
 
 #All the bCs
 
@@ -369,19 +374,19 @@ velDbc = uw.conditions.DirichletCondition( variable      = velocityField,
 
 
 
-# In[19]:
+# In[37]:
 
 viscosityMapFn = fn.misc.constant(1.)
 
 
-# In[20]:
+# In[38]:
 
 uw.barrier()
 
 
 # ## Stokes
 
-# In[21]:
+# In[39]:
 
 stokesPIC = uw.systems.Stokes( velocityField  = velocityField, 
                                    pressureField  = pressureField,
@@ -390,7 +395,7 @@ stokesPIC = uw.systems.Stokes( velocityField  = velocityField,
                                    fn_bodyforce   = (0., 0.) )
 
 
-# In[23]:
+# In[40]:
 
 solver = uw.systems.Solver(stokesPIC)
 
@@ -400,11 +405,20 @@ solver = uw.systems.Solver(stokesPIC)
 # currently, setting the `solver.options.main.Q22_pc_type` to anything other than 'uw' (the default), results in a petsc crash in parallel. 
 # 
 
-# In[ ]:
+# In[41]:
 
 
 
-solver.options.main.Q22_pc_type='gkgdiag' #should crash in parallel
+#solver.options.main.Q22_pc_type='gkgdiag' #should crash in parallel
+solver.options.main.Q22_pc_type='uw' #should work in parallel
+
+#solver.set_penalty(1e7)
+
+
+# In[42]:
+
+
+solver.solve()
 
 
 # In[167]:
